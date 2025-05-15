@@ -1,35 +1,45 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline - Deploy to Mac
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger on push to main branch
 
 jobs:
-  build-and-deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 🧪 Install Dependencies & Run Tests
-        run: |
-          npm install
-          # Add test command if you have tests, like:
-          # npm test
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'   # Your Node.js version
 
-      - name: 🐳 Build Docker Image
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+        # Make sure you have a test script in package.json
+
+      - name: Build Docker image
         run: docker build -t devops-demo-app .
 
-      - name: 🚀 Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/devops-demo-app || git clone https://github.com/${{ github.repository }}.git && cd devops-demo-app
-            git pull origin main
-            docker compose down || true
-            docker compose up -d --build
+      - name: Deploy to Mac via SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.mac_SSH_KEY }}
+          MAC_USER: ${{ secrets.MAC_USER }}
+          MAC_IP: ${{ secrets.MAC_IP }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          ssh -i private_key -o StrictHostKeyChecking=no $MAC_USER@$MAC_IP "
+            cd /Users/$MAC_USER/Desktop/devops-demo-app &&
+            docker-compose down &&
+            docker-compose build &&
+            docker-compose up -d
+          "
+        
