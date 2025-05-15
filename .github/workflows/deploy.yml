@@ -2,44 +2,43 @@ name: CI/CD Pipeline - Deploy to Mac
 
 on:
   push:
-    branches:
-      - main  # Trigger on push to main branch
+    branches: [main]
 
 jobs:
-  build-test-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      # Checks out your code so the workflow can access it
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'   # Your Node.js version
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+      # Installs Node.js to run npm commands
 
-      - name: Install dependencies
-        run: npm install
+    - name: Install dependencies
+      run: npm install
+      # Installs all node_modules defined in package.json
 
-      - name: Run tests
-        run: npm test
-        # Make sure you have a test script in package.json
+    - name: Run tests
+      run: npm test
+      # Runs your Jest tests. If tests fail, pipeline stops here!
 
-      - name: Build Docker image
-        run: docker build -t devops-demo-app .
+    - name: Build Docker image
+      run: docker build -t devops-demo-app .
+      # Builds your Docker image only if tests pass
 
-      - name: Deploy to Mac via SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.mac_SSH_KEY }}
-          MAC_USER: ${{ secrets.MAC_USER }}
-          MAC_IP: ${{ secrets.MAC_IP }}
-        run: |
-          echo "$SSH_PRIVATE_KEY" > private_key
-          chmod 600 private_key
-          ssh -i private_key -o StrictHostKeyChecking=no $MAC_USER@$MAC_IP "
-            cd /Users/$MAC_USER/Desktop/devops-demo-app &&
-            docker-compose down &&
-            docker-compose build &&
-            docker-compose up -d
-          "
-        
+    - name: Deploy to Mac via SSH
+      uses: appleboy/ssh-action@v0.1.9
+      with:
+        host: ${{ secrets.MAC_IP }}
+        username: ${{ secrets.MAC_USER }}
+        key: ${{ secrets.MAC_SSH_KEY }}
+        script: |
+          cd /Users/oscargiri/Desktop/devops-demo-app
+          docker-compose down
+          docker-compose up -d --build
+      # Connects to your Mac over SSH and runs docker-compose commands to update your app
